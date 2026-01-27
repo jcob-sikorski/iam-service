@@ -33,7 +33,7 @@ public class SecurityConfig {
             // 2. Configure endpoint rules: This defines the "Security Gauntlet."
             .authorizeHttpRequests(auth -> auth
                 // Public Door: Specifically allows any unauthenticated user to POST to /tenants (Sign-up).
-                .requestMatchers(HttpMethod.POST, "/api/v1/tenants").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/tenants", "/api/v1/users").permitAll()
                 
                 // Locked Doors: For any other URL, Spring will check if the user is logged in. 
                 // If not, it blocks the request before it reaches any Controller.
