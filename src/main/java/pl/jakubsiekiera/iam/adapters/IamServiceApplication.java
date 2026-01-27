@@ -1,4 +1,4 @@
-package pl.jakubsiekiera.iam;
+package pl.jakubsiekiera.iam.adapters;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
