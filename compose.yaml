@@ -3,8 +3,41 @@ services:
     image: postgres:16
     container_name: iam-postgres
     environment:
-      POSTGRES_DB: iam_db
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
+      POSTGRES_DB: iam_db
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # We use a shell command to create the second DB before the main process starts
+    command: >
+      sh -c "docker-entrypoint.sh postgres & 
+      sleep 5; 
+      psql -U user -d iam_db -c 'CREATE DATABASE keycloak_db;' || true; 
+      wait"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d iam_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.0
+    container_name: iam-keycloak
+    command: start-dev --http-port 8081
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_db
+      KC_DB_USERNAME: user
+      KC_DB_PASSWORD: password
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
