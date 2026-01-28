@@ -16,8 +16,8 @@ public class User {
     // Map TenantId -> Membership details
     private final Map<TenantId, TenantMembership> memberships = new HashMap<>();
 
-    // Private constructor
-    private User(UserId id, Email email, String passwordHash) {
+    // Public constructor
+    public User(UserId id, Email email, String passwordHash) {
         this.id = id;
         this.email = email;
         this.passwordHash = passwordHash;

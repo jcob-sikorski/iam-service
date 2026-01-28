@@ -14,7 +14,7 @@ public class Tenant {
     // We will add subscriptionPlan later
 
     // Private constructor for internal use / hydration
-    private Tenant(TenantId id, String name, TenantStatus status, Instant creationDate) {
+    public Tenant(TenantId id, String name, TenantStatus status, Instant creationDate) {
         this.id = id;
         this.name = name;
         this.status = status;

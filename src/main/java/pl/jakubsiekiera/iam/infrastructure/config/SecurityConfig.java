@@ -38,6 +38,9 @@ public class SecurityConfig {
                 // Allow invites (for testing purposes only!)
                 .requestMatchers(HttpMethod.POST, "/api/v1/tenants/*/users").permitAll()
                 
+                // Exceptions can be rendered publicly
+                .requestMatchers("/error").permitAll()
+                
                 // Locked Doors: For any other URL, Spring will check if the user is logged in. 
                 // If not, it blocks the request before it reaches any Controller.
                 .anyRequest().authenticated()

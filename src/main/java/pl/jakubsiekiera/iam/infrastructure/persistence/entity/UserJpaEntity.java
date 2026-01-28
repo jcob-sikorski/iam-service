@@ -3,6 +3,8 @@ package pl.jakubsiekiera.iam.infrastructure.persistence.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 import java.util.UUID;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * @Entity: Maps this class to a database row.
@@ -44,4 +46,13 @@ public class UserJpaEntity {
      * 3. Relationships: Eventually, you might link this to TenantJpaEntity via a 
      * 'memberships' table to support multi-tenancy.
      */
+    /**
+     * One user can have multiple memberships.
+     * * - mappedBy: Linked to the 'user' field in UserMembershipJpaEntity.
+     * - CascadeType.ALL: If the User is saved/deleted, memberships follow.
+     * - orphanRemoval: Removing a membership from this list deletes it from the DB.
+     * - FetchType.EAGER: Memberships are loaded immediately with the User.
+     */
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<UserMembershipJpaEntity> memberships = new ArrayList<>();
 }
