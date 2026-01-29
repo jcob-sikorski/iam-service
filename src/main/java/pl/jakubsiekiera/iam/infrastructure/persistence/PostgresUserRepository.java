@@ -53,9 +53,8 @@ public class PostgresUserRepository implements UserRepository {
     private UserJpaEntity toEntity(User domain) {
         UserJpaEntity entity = new UserJpaEntity(); // Initialize the JPA container
         entity.setId(domain.getId().value()); // Extract raw UUID from Value Object
-        entity.setEmail(domain.getEmail().value()); // Extract raw String from Email Value Object
-        entity.setPasswordHash(domain.getPasswordHash()); // Map the security hash
-
+        entity.setKeycloakId(domain.getKeycloakId()); // Map KeycloakId
+        entity.setEmail(domain.getEmail().value());
         // Transform the Map of Domain Memberships into a List of JPA Entities
         var membershipEntities = domain.getMemberships().values().stream().map(m -> {
             UserMembershipJpaEntity me = new UserMembershipJpaEntity();
@@ -72,19 +71,17 @@ public class PostgresUserRepository implements UserRepository {
 
         entity.setMemberships(membershipEntities); // Attach the collection to the parent entity
         return entity;
-    }
+}
 
     /**
      * Converts a 'UserJpaEntity' (Database data) back into a Domain 'User' (Business Logic)
      */
-    private User toDomain(UserJpaEntity entity) {
-        // Reconstruct (Rehydrate) the User domain object using its constructor
-        User user = new User(
-            new UserId(entity.getId()), // Wrap raw UUID back into a Value Object
-            new Email(entity.getEmail()), // Wrap raw String back into an Email Value Object
-            entity.getPasswordHash() // Pass the raw password hash
-        );
-
+private User toDomain(UserJpaEntity entity) {
+    User user = new User(
+        new UserId(entity.getId()), // Wrap raw UUID back into a Value Object
+        entity.getKeycloakId(), // Map KeycloakId
+        new Email(entity.getEmail()) // Wrap raw String back into an Email Value Object
+    );
         // Iterate through stored memberships to rebuild the domain state
         for (UserMembershipJpaEntity me : entity.getMemberships()) {
             TenantId tid = new TenantId(me.getTenantId()); // Reconstruct the TenantId

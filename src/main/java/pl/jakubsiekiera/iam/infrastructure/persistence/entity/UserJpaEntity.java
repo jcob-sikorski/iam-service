@@ -30,22 +30,11 @@ public class UserJpaEntity {
      * This acts as the "identity" for authentication.
      */
     @Column(nullable = false, unique = true)
+    private String keycloakId; // We map this new field
+
+    @Column(nullable = false, unique = true)
     private String email;
-
-    /**
-     * passwordHash: NEVER store plain-text passwords.
-     * This field stores the salted hash (e.g., BCrypt or Argon2).
-     * It is marked 'nullable = false' because every user must have a credential.
-     */
-    @Column(nullable = false)
-    private String passwordHash;
-
-    /* * FUTURE SCALABILITY NOTES:
-     * 1. Roles: If you choose @ElementCollection, JPA will create a separate join table.
-     * 2. JSONB: If using PostgreSQL, you could store roles in a single column for speed.
-     * 3. Relationships: Eventually, you might link this to TenantJpaEntity via a 
-     * 'memberships' table to support multi-tenancy.
-     */
+    
     /**
      * One user can have multiple memberships.
      * * - mappedBy: Linked to the 'user' field in UserMembershipJpaEntity.

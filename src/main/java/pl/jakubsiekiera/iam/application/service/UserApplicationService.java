@@ -20,7 +20,6 @@ public class UserApplicationService {
 
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
-    private final PasswordEncoder passwordEncoder; // Spring Security's interface
 
     @Transactional
     public UserResponse registerUser(RegisterUserCommand command) {
@@ -31,22 +30,20 @@ public class UserApplicationService {
             throw new IllegalArgumentException("Email already in use: " + command.email());
         }
 
-        // 2. Hash password
-        String hashedPassword = passwordEncoder.encode(command.password());
+        // No hashing needed! We trust the ID passed from the upstream system
 
-        // 3. Create Aggregate
+        // Create Aggregate
         User user = User.register(
             UserId.generate(),
-            email,
-            hashedPassword
+            command.keycloakId(),
+            email
         );
 
-        // 4. Save
         userRepository.save(user);
 
         return UserResponse.from(user);
     }
-
+    
     @Transactional
     public void inviteUserToTenant(String tenantIdStr, String emailStr, String roleName) {
         // 1. Validate Tenant Exists

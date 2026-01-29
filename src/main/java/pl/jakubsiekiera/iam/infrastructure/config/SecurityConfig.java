@@ -3,10 +3,9 @@ package pl.jakubsiekiera.iam.infrastructure.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -32,31 +31,24 @@ public class SecurityConfig {
             
             // 2. Configure endpoint rules: This defines the "Security Gauntlet."
             .authorizeHttpRequests(auth -> auth
-                // Public Door: Specifically allows any unauthenticated user to POST to /tenants (Sign-up).
+                // Registration endpoints
                 .requestMatchers(HttpMethod.POST, "/api/v1/tenants", "/api/v1/users").permitAll()
-                
-                // Allow invites (for testing purposes only!)
-                .requestMatchers(HttpMethod.POST, "/api/v1/tenants/*/users").permitAll()
-                
+
                 // Exceptions can be rendered publicly
                 .requestMatchers("/error").permitAll()
-                
-                // Locked Doors: For any other URL, Spring will check if the user is logged in. 
+
+                // Everything else needs a token: For any other URL, Spring will check if the user is logged in. 
                 // If not, it blocks the request before it reaches any Controller.
                 .anyRequest().authenticated()
-            );
+            )
+            // 3. Resource Server Configuration: Tells Spring to treat this app as an OAuth2 Resource Server.
+            // It will look for a Bearer Token (JWT) in the request headers and validate it 
+            // using the default settings (usually defined in application.properties/yml).
+            .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+
 
         // .build() converts our configuration into the actual FilterChain object 
         // that will sit in front of our application to guard it.
         return http.build();
-    }
-
-    /**
-     * PasswordEncoder: This bean tells Spring how to hash and verify passwords.
-     * BCrypt is the current industry standard for secure password storage.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }

@@ -10,22 +10,22 @@ import java.util.Set;
 @Getter
 public class User {
     private final UserId id;
+    private final String keycloakId; // Link to Identity Provider
     private final Email email;
-    private String passwordHash; // We'll handle hashing in the Service layer
+    // NO PASSWORD FIELD HERE
     
-    // Map TenantId -> Membership details
     private final Map<TenantId, TenantMembership> memberships = new HashMap<>();
 
-    // Public constructor
-    public User(UserId id, Email email, String passwordHash) {
+    // Internal Constructor
+    public User(UserId id, String keycloakId, Email email) {
         this.id = id;
+        this.keycloakId = keycloakId;
         this.email = email;
-        this.passwordHash = passwordHash;
     }
 
     // Factory: Register a new user (initially not part of any tenant, or maybe a default one)
-    public static User register(UserId id, Email email, String passwordHash) {
-        return new User(id, email, passwordHash);
+    public static User register(UserId id, String keycloakId, Email email) {
+        return new User(id, keycloakId, email);
     }
 
     // Business Logic: Invite/Add to Tenant
@@ -38,7 +38,7 @@ public class User {
             memberships.put(tenantId, new TenantMembership(tenantId, role));
         }
     }
-    
+
     public Set<Role> getRolesForTenant(TenantId tenantId) {
         if (!memberships.containsKey(tenantId)) {
             return Set.of();
