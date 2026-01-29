@@ -37,6 +37,9 @@ public class SecurityConfig {
                 // Exceptions can be rendered publicly
                 .requestMatchers("/error").permitAll()
 
+                // Allow access to Actuator health
+                .requestMatchers("/actuator/health").permitAll()
+
                 // Everything else needs a token: For any other URL, Spring will check if the user is logged in. 
                 // If not, it blocks the request before it reaches any Controller.
                 .anyRequest().authenticated()
