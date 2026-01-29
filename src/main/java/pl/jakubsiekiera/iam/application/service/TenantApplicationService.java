@@ -4,16 +4,21 @@ import pl.jakubsiekiera.iam.application.dto.RegisterTenantCommand;
 import pl.jakubsiekiera.iam.application.dto.TenantResponse; // Import the new DTO
 import pl.jakubsiekiera.iam.domain.model.tenant.Tenant;
 import pl.jakubsiekiera.iam.domain.model.tenant.TenantId;
+import pl.jakubsiekiera.iam.domain.event.TenantRegisteredEvent;
 import pl.jakubsiekiera.iam.domain.repository.TenantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
+import java.time.Instant;
+
 
 @Service
 @RequiredArgsConstructor
 public class TenantApplicationService {
 
     private final TenantRepository tenantRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Transactional
     public TenantResponse registerTenant(RegisterTenantCommand command) {
@@ -29,7 +34,16 @@ public class TenantApplicationService {
         // 3. Persist
         tenantRepository.save(newTenant);
 
-        // 4. Return DTO (using the static mapper method)
+        // 3. PUBLISH EVENT
+        // We convert Domain Object -> Event Object
+        TenantRegisteredEvent event = new TenantRegisteredEvent(
+            newId,
+            newTenant.getName(),
+            Instant.now()
+        );
+        eventPublisher.publishEvent(event);
+
+        // 5. Return DTO (using the static mapper method)
         return TenantResponse.from(newTenant);
     }
 }
