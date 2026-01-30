@@ -9,8 +9,8 @@ import pl.jakubsiekiera.iam.domain.model.tenant.TenantId;
 import pl.jakubsiekiera.iam.domain.model.user.Role;
 import pl.jakubsiekiera.iam.domain.repository.UserRepository;
 import pl.jakubsiekiera.iam.domain.repository.TenantRepository;
+import pl.jakubsiekiera.iam.domain.service.IdentityProvider; // Import the new interface
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,22 +20,29 @@ public class UserApplicationService {
 
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
+    private final IdentityProvider identityProvider; // Inject the IDP adapter
 
     @Transactional
     public UserResponse registerUser(RegisterUserCommand command) {
         Email email = new Email(command.email());
 
-        // 1. Check uniqueness (simple check for now)
+        // 1. Check local uniqueness
         if (userRepository.findByEmail(email).isPresent()) {
             throw new IllegalArgumentException("Email already in use: " + command.email());
         }
 
-        // No hashing needed! We trust the ID passed from the upstream system
+        // 2. CALL KEYCLOAK (The Missing Step)
+        // We delegate password handling to Keycloak. It returns the unique 'sub' ID.
+        String keycloakId = identityProvider.registerUser(
+            command.username(), 
+            command.email(), 
+            command.password()
+        );
 
-        // Create Aggregate
+        // 3. Create Aggregate using the ID from Keycloak
         User user = User.register(
             UserId.generate(),
-            command.keycloakId(),
+            keycloakId, // Now this is not null!
             email
         );
 
@@ -46,24 +53,17 @@ public class UserApplicationService {
     
     @Transactional
     public void inviteUserToTenant(String tenantIdStr, String emailStr, String roleName) {
-        // 1. Validate Tenant Exists
         TenantId tenantId = TenantId.fromString(tenantIdStr);
         if (tenantRepository.findById(tenantId).isEmpty()) {
             throw new IllegalArgumentException("Tenant not found: " + tenantIdStr);
         }
 
-        // 2. Find User (For this step, we assume User must already exist)
         Email email = new Email(emailStr);
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with email: " + emailStr));
 
-        // 3. Create Role Value Object
         Role role = new Role(roleName);
-
-        // 4. Update Domain Model
         user.addToTenant(tenantId, role);
-
-        // 5. Save (updates the user aggregate)
         userRepository.save(user);
     }
 }
