@@ -1,0 +1,67 @@
+# ==============================================================================
+# 1. RECEIVERS: The "Front Door" of the Collector
+# These define the ports and protocols the Collector uses to listen for data.
+# ==============================================
+receivers:
+  otlp: # OTLP stands for OpenTelemetry Protocol (the universal standard).
+    protocols:
+      # gRPC: A high-performance connection used by most backend apps (like Java/Spring).
+      # It's like a dedicated high-speed fiber line for data.
+      grpc:
+        endpoint: 0.0.0.0:4317 # Listen on all network interfaces on port 4317.
+      
+      # HTTP: A standard web-style connection. 
+      # Useful if your app is a website (JavaScript) or if you have strict firewalls.
+      http:
+        endpoint: 0.0.0.0:4318 # Listen on all network interfaces on port 4318.
+
+# ==============================================================================
+# 2. PROCESSORS: The "Assembly Line"
+# This is where the Collector cleans, transforms, or optimizes data before sending it.
+# ==============================================
+processors:
+  # Instead of sending data to the database 1-by-1 (which is slow and expensive),
+  # it waits until it has a "bucket" full of data (e.g., 8192 spans) or 200ms has passed,
+  # then sends the whole bucket at once. This saves CPU and Network.
+  batch:
+
+# ==============================================================================
+# 3. EXPORTERS: The "Shipping Dock"
+# These define where the processed data should be delivered.
+# ==============================================
+exporters:
+  # TRACE EXPORTER: Specifically for "Spans" (timelines of requests).
+  otlp: 
+    endpoint: tempo:4317 # This sends data to a service named 'tempo' (the database).
+    tls:
+      insecure: true     # "Insecure" means: "Don't check for SSL certificates."
+                         # Safe for internal networks/Docker, but don't do this over the public internet.
+
+  debug:
+    verbosity: detailed
+
+  # METRIC EXPORTER: Specifically for "Numbers" (CPU usage, request counts).
+  # ARCHITECTURE NOTE: This is a "Pull" exporter.
+  # It doesn't send data anywhere; it creates a tiny website (at port 8889) 
+  # where Prometheus can come to "scrape" (download) the data.
+  prometheus: 
+    endpoint: "0.0.0.0:8889"
+
+# ==============================================================================
+# 4. SERVICE PIPELINES: The "Logic"
+# Think of this as the "Wiring Diagram." Even if you define receivers/exporters above, 
+# they do NOTHING unless you connect them here in a pipeline.
+# ==============================================
+service:
+  pipelines:
+    # THE TRACE PATHWAY
+    traces:
+      receivers: [otlp]        # 1. Take data from the Front Door (4317).
+      processors: [batch]      # 2. Put it in buckets (Batching).
+      exporters: [otlp, debug]        # 3. Ship it to Tempo.
+
+    # THE METRICS PATHWAY
+    metrics:
+      receivers: [otlp]               # 1. Take data from the same Front Door.
+      processors: [batch]             # 2. Put it in buckets.
+      exporters: [prometheus, debug]  # 3. Make it available on port 8889 for Prometheus.

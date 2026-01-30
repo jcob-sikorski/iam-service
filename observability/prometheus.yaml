@@ -1,0 +1,32 @@
+# ==============================================================================
+# 1. GLOBAL SETTINGS: Default rules for the entire Prometheus server
+# ==============================================
+global:
+  # The "Heartbeat." This tells Prometheus: "Wake up every 5 seconds, 
+  # go to your targets, and download their data."
+  # If you set this to 1m, you'd only see updates once a minute.
+  scrape_interval: 5s 
+
+# ==============================================================================
+# 2. SCRAPE CONFIGS: The "Address Book"
+# This is a list of all the places (targets) Prometheus should visit.
+# ==============================================
+scrape_configs:
+  # A 'job' is just a way to group similar targets together. 
+  # Here, we are creating a group specifically for your OTel Collector.
+  - job_name: 'otel-collector'
+
+    # 'static_configs' means: "I am giving you the exact address manually."
+    # (As opposed to 'service discovery' where it finds apps automatically).
+    static_configs:
+      # The exact location of the OTel Collector.
+      # 'otel-collector' is the name of the container/server.
+      # '8889' is the port you opened in the Collector's config.
+      - targets: ['otel-collector:8889']
+        
+        # LABELS: The "Identity Tags."
+        # Every single metric that comes from this target will have 
+        # {application="iam-service-group"} attached to it automatically.
+        # This is vital for filtering data later in Grafana.
+        labels:
+          application: 'iam-service-group'

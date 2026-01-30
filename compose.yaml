@@ -1,43 +1,112 @@
 services:
+  # --- DATABASE LAYER ---
   postgres:
     image: postgres:16
     container_name: iam-postgres
     environment:
       POSTGRES_USER: user
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: iam_db
+      POSTGRES_DB: iam_db # The default DB created on startup
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    # We use a shell command to create the second DB before the main process starts
+      - postgres_data:/var/lib/postgresql/data # Persists DB data even if container is deleted
     command: >
       sh -c "docker-entrypoint.sh postgres & 
       sleep 5; 
       psql -U user -d iam_db -c 'CREATE DATABASE keycloak_db;' || true; 
       wait"
+      # ^ EXPLANATION: This starts Postgres, waits 5 seconds, and creates a SECOND 
+      # database specifically for Keycloak. The "|| true" prevents the container 
+      # from crashing if the DB already exists.
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d iam_db"]
+      test: ["CMD-SHELL", "pg_isready -U user -d iam_db"] # Checks if DB is accepting connections
       interval: 5s
       timeout: 5s
       retries: 5
 
+  # --- IDENTITY PROVIDER ---
   keycloak:
     image: quay.io/keycloak/keycloak:26.0
     container_name: iam-keycloak
-    command: start-dev --http-port 8081
+    command: start-dev --http-port 8081 # Runs in dev mode (easier for testing)
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_db
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_db # Connects to the second DB created above
       KC_DB_USERNAME: user
       KC_DB_PASSWORD: password
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin
+      KEYCLOAK_ADMIN: admin # Initial admin UI username
+      KEYCLOAK_ADMIN_PASSWORD: admin # Initial admin UI password
+      KC_HOSTNAME_STRICT: "false" # Disables strict hostname checking (good for local dev)
+      KC_HTTP_ENABLED: "true" # Enables plain HTTP (non-HTTPS)
+      KC_PROXY_HEADERS: "xforwarded" # Important for running behind load balancers/proxies
     ports:
       - "8081:8081"
     depends_on:
       postgres:
-        condition: service_healthy
+        condition: service_healthy # Only starts Keycloak once Postgres passes its healthcheck
+
+  # --- OBSERVABILITY LAYER ---
+
+  # 1. OpenTelemetry Collector (The Traffic Controller)
+  # Acts as a "middleman" that receives data, processes it, and sends it to backends.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: iam-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # Receives traces/metrics via gRPC (fast)
+      - "4318:4318" # Receives traces/metrics via HTTP (standard)
+      - "8889:8889" # Used by Prometheus to scrape metrics from the collector
+    restart: always # Keeps trying to connect to Tempo if it's slow to start
+    depends_on:
+      - tempo
+
+  # 2. Tempo (The Tracing Warehouse)
+  # Stores "Traces" - maps of how a single request travels through different services.
+  tempo:
+    image: grafana/tempo:latest
+    container_name: iam-tempo
+    user: root
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./observability/tempo.yaml:/etc/tempo.yaml
+      - tempo_data:/tmp/tempo # Persistent storage for trace logs
+    ports:
+      - "3200:3200" # Port for Grafana to query traces
+      - "4317"      # Internal port for receiving OTLP data
+    restart: unless-stopped
+
+  # 3. Prometheus (The Metrics Warehouse)
+  # Stores "Metrics" - numerical data over time (e.g., CPU usage, login counts).
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: iam-prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yaml"
+      - "--web.enable-remote-write-receiver" # Allows Tempo to send "Service Graph" data back to Prometheus
+    volumes:
+      - ./observability/prometheus.yaml:/etc/prometheus/prometheus.yaml
+    ports:
+      - "9090:9090" # Prometheus UI and API
+
+  # 4. Grafana (The Visual Dashboard)
+  # The UI where you actually see the graphs and trace timelines.
+  grafana:
+    image: grafana/grafana:latest
+    container_name: iam-grafana
+    ports:
+      - "3000:3000" # Access this in your browser: localhost:3000
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true # Lets you view dashboards without logging in (dev only!)
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+    depends_on:
+      - prometheus
+      - tempo
 
 volumes:
-  postgres_data:
+  postgres_data: # Persists your users and realms in Keycloak
+  tempo_data:    # Persists your historical trace data

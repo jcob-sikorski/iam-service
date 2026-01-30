@@ -1,0 +1,60 @@
+# ==============================================================================
+# 1. SERVER: How you talk to Tempo's UI
+# ==============================================
+server:
+  # This is the port used for Tempo's own health checks and API.
+  # When you connect Grafana to Tempo to "see" your traces, 
+  # Grafana will often talk to Tempo on this port.
+  http_listen_port: 3200
+
+# ==============================================================================
+# 2. DISTRIBUTOR: The "Reception Desk"
+# This is the part of Tempo that handles incoming data from the Collector.
+# ==============================================
+distributor:
+  receivers:
+    # Here, Tempo says: "I speak OTLP too!" 
+    # This matches your OTel Collector's 'otlp' exporter.
+    otlp:
+      protocols:
+        grpc: # High-speed lane (usually port 4317)
+          endpoint: "0.0.0.0:4317"
+        http: # Standard lane (usually port 4318)
+          endpoint: "0.0.0.0:4318"
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: docker-compose
+  storage:
+    path: /tmp/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true
+
+# ==============================================================================
+# 3. STORAGE: The "Warehouse Shelves"
+# This defines where the traces are actually written to the hard drive.
+# ==============================================
+storage:
+  trace:
+    # 'backend: local' means "Save the files directly on this computer's disk."
+    # In a massive company, this might say 's3' (Amazon Storage).
+    backend: local                     
+
+    # WAL (Write Ahead Log): The "Emergency Notebook."
+    # Before Tempo carefully organizes data into blocks, it scribbles everything 
+    # here immediately. If the power goes out, Tempo looks at this log to 
+    # make sure no data was lost.
+    wal:
+      path: /tmp/tempo/wal             
+
+    # LOCAL: The "Main Filing Cabinet."
+    # This is where the traces end up once they are compressed and 
+    # ready to be searched by you in Grafana.
+    local:
+      path: /tmp/tempo/blocks
+
+overrides:
+  metrics_generator_processors: [service-graphs, span-metrics]
