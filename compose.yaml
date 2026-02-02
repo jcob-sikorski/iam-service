@@ -120,6 +120,10 @@ services:
     volumes:
       # Provisioning automatically adds Prometheus and Tempo as data sources on startup.
       - ./observability/grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+      # 2. Dashboard Provider Config (NEW)
+      - ./observability/grafana-dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      # 3. The Dashboard JSON Files (NEW)
+      - ./observability/dashboards:/etc/grafana/provisioning/dashboards
 
 volumes:
   postgres_data:
