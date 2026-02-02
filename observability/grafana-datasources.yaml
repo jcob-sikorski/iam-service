@@ -1,0 +1,44 @@
+# observability/grafana-datasources.yaml
+# Configures Grafana datasources automatically via 'provisioning'
+apiVersion: 1
+
+datasources:
+  # --- METRICS CONFIGURATION ---
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus          # Unique ID used by dashboards and other datasources to reference this
+    url: http://prometheus:9090
+    access: proxy            # Grafana backend will fetch the data (hides Prometheus from public internet)
+    editable: true
+    jsonData:
+      httpMethod: POST       # Using POST allows for larger/complex PromQL queries that might exceed URL length limits
+      
+      # CORRELATION: METRICS -> TRACES
+      # This section creates a clickable link in Grafana panels.
+      # When a metric has an 'exemplar' (a trace ID attached to a metric), 
+      # Grafana will provide a direct link to view that specific trace in Tempo.
+      exemplarTraceIdDestinations:
+        - name: trace_id     # The label name in your Prometheus exemplars
+          datasourceUid: tempo
+
+  # --- TRACES CONFIGURATION ---
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    url: http://tempo:3200
+    access: proxy
+    editable: true
+    jsonData:
+      httpMethod: GET
+      
+      # CORRELATION: TRACES -> METRICS (Service Graph)
+      # Enables the "Service Graph" view within Tempo using data stored in Prometheus.
+      # This allows you to see Request, Error, and Duration (RED) metrics for your spans.
+      serviceMap:
+        datasourceUid: 'prometheus'
+      
+      # VISUALIZATION: TOPOLOGY
+      # Enables the Node Graph visualization, which provides a bird's-eye view 
+      # of how services interact within a specific trace.
+      nodeGraph:
+        enabled: true

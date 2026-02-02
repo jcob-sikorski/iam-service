@@ -1,60 +1,65 @@
-# ==============================================================================
-# 1. SERVER: How you talk to Tempo's UI
-# ==============================================
+# --- Global Server Settings ---
 server:
-  # This is the port used for Tempo's own health checks and API.
-  # When you connect Grafana to Tempo to "see" your traces, 
-  # Grafana will often talk to Tempo on this port.
+  # The port where Tempo exposes its HTTP footprint (metrics, health checks, and API).
+  # Default is usually 3200.
   http_listen_port: 3200
 
-# ==============================================================================
-# 2. DISTRIBUTOR: The "Reception Desk"
-# This is the part of Tempo that handles incoming data from the Collector.
-# ==============================================
+# --- Ingestion Layer (The Entry Point) ---
 distributor:
   receivers:
-    # Here, Tempo says: "I speak OTLP too!" 
-    # This matches your OTel Collector's 'otlp' exporter.
     otlp:
       protocols:
-        grpc: # High-speed lane (usually port 4317)
+        # Enables the OpenTelemetry gRPC receiver. 
+        # 0.0.0.0:4317 allows it to listen on all network interfaces.
+        grpc:
           endpoint: "0.0.0.0:4317"
-        http: # Standard lane (usually port 4318)
+        # Enables the OpenTelemetry HTTP receiver, typically used by web apps 
+        # or environments where gRPC is restricted.
+        http:
           endpoint: "0.0.0.0:4318"
 
-metrics_generator:
-  registry:
-    external_labels:
-      source: tempo
-      cluster: docker-compose
-  storage:
-    path: /tmp/tempo/generator/wal
-    remote_write:
-      - url: http://prometheus:9090/api/v1/write
-        send_exemplars: true
+# --- Processing Layer (The "Wait Room") ---
+ingester:
+  # How long to wait for more spans after a trace has seen no activity 
+  # before considering it "done" and eligible to be cut into a block.
+  trace_idle_period: 10s
+  
+  # Max size of an individual data block in memory before it is flushed to the WAL/Backend.
+  max_block_bytes: 1_000_000
+  
+  # Max time a block can remain open in the ingester before being flushed, 
+  # even if it hasn't reached 'max_block_bytes'.
+  max_block_duration: 5m
 
-# ==============================================================================
-# 3. STORAGE: The "Warehouse Shelves"
-# This defines where the traces are actually written to the hard drive.
-# ==============================================
+# --- Optimization Layer (The Housekeeper) ---
+compactor:
+  compaction:
+    # How often the compactor groups smaller blocks into larger, more searchable ones.
+    compaction_window: 1h
+    
+    # The maximum size a single compacted block can reach.
+    max_block_bytes: 100_000_000
+    
+    # Total time to keep raw trace data before it is deleted. 
+    # Note: 1h is very short—usually used for testing.
+    block_retention: 1h
+    
+    # How long to keep the original (uncompacted) blocks after a 
+    # successful compaction before deleting them.
+    compacted_block_retention: 10m
+
+# --- Persistence Layer (Where the data lives) ---
 storage:
   trace:
-    # 'backend: local' means "Save the files directly on this computer's disk."
-    # In a massive company, this might say 's3' (Amazon Storage).
-    backend: local                     
-
-    # WAL (Write Ahead Log): The "Emergency Notebook."
-    # Before Tempo carefully organizes data into blocks, it scribbles everything 
-    # here immediately. If the power goes out, Tempo looks at this log to 
-    # make sure no data was lost.
+    # Defines where the traces are saved. 'local' is for disk storage (Filesystem).
+    # In production, this is often 's3', 'gcs', or 'azure'.
+    backend: local
+    
+    # Write Ahead Log (WAL) settings. 
+    # This records incoming traces immediately to prevent data loss if the process crashes.
     wal:
-      path: /tmp/tempo/wal             
-
-    # LOCAL: The "Main Filing Cabinet."
-    # This is where the traces end up once they are compressed and 
-    # ready to be searched by you in Grafana.
+      path: /tmp/tempo/wal
+    
+    # The final destination for completed/compacted trace blocks.
     local:
       path: /tmp/tempo/blocks
-
-overrides:
-  metrics_generator_processors: [service-graphs, span-metrics]

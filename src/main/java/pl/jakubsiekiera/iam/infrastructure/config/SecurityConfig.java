@@ -40,6 +40,9 @@ public class SecurityConfig {
                 // Allow access to Actuator health
                 .requestMatchers("/actuator/health").permitAll()
 
+                // Allow our test endpoint so we can check if Tempo receives the trace
+                .requestMatchers("/api/ping").permitAll()
+
                 // Everything else needs a token: For any other URL, Spring will check if the user is logged in. 
                 // If not, it blocks the request before it reaches any Controller.
                 .anyRequest().authenticated()
