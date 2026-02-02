@@ -29,6 +29,7 @@ This project demonstrates a production-grade implementation of **Hexagonal Archi
 * **Build Tool**: Maven
 * **Database**: PostgreSQL 16
 * **Identity Provider**: Keycloak 26.0
+* **Observability**: OpenTelemetry, Prometheus, Grafana, Tempo
 * **Containerization**: Docker & Docker Compose
 
 ## Project Structure
@@ -62,7 +63,7 @@ src/main/java/pl/jakubsiekiera/iam/
 
 ### 1. Start Infrastructure
 
-Spin up PostgreSQL and Keycloak using Docker Compose:
+Spin up PostgreSQL, Keycloak, and the Observability Stack using Docker Compose:
 
 ```bash
 docker compose up -d
@@ -71,6 +72,9 @@ docker compose up -d
 
 * **Postgres**: Port `5432`
 * **Keycloak**: Port `8081`
+* **Grafana**: Port `3000` (Visualization)
+* **Prometheus**: Port `9090` (Metrics)
+* **Tempo**: Port `3200` (Tracing)
 
 ### 2. Configure Keycloak
 
@@ -169,6 +173,23 @@ curl -i -X GET http://localhost:8080/api/v1/tenants/TENANT_ID \
 
 ```
 
+## Observability
+
+The project includes a pre-configured observability stack to monitor metrics and distributed traces.
+
+### Grafana Dashboards
+Access Grafana at [http://localhost:3000](http://localhost:3000).
+* **Credentials**: Anonymous admin access is enabled for development (no login required).
+* **Dashboards**: A pre-provisioned **IAM Service Overview** dashboard is available, showing:
+    *   Request rates and latencies.
+    *   JVM metrics (Memory, GC, Threads).
+    *   Keycloak metrics.
+
+### Distributed Tracing
+* **Tempo** is configured as the tracing backend.
+* **OpenTelemetry Collector** aggregates traces from the application and Keycloak.
+* You can view traces in Grafana using the **Explore** tab or by clicking on trace IDs in logs/dashboards.
+
 ## Architecture Decisions
 
 | Concept | Implementation | Reasoning |
@@ -180,7 +201,6 @@ curl -i -X GET http://localhost:8080/api/v1/tenants/TENANT_ID \
 
 ## Future Roadmap
 
-* [ ] **Distributed Tracing**: Add OpenTelemetry/Zipkin.
 * [ ] **Audit Logging**: Persist domain events to a dedicated audit store.
 * [ ] **Tenant Deletion**: Implement "Suspend" and "Soft Delete" logic.
 * [ ] **Frontend**: React application with OIDC integration.
